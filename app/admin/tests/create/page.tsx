@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Plus, Trash2, Save, ArrowLeft, AlertTriangle } from "lucide-react"
-import { createTest, type Question } from "@/lib/firebase"
+import { createTest, uploadAnswerImage, type Question } from "@/lib/appwrite"
 import Link from "next/link"
 
 interface QuestionForm {
@@ -21,6 +21,9 @@ interface QuestionForm {
   options: string[]
   correctIndex: number
   explanation: string
+  videoAnswer?: string
+  imageAnswer?: string
+  imageFile?: File | null
 }
 
 export default function CreateTestPage() {
@@ -37,18 +40,27 @@ export default function CreateTestPage() {
       options: ["3", "4", "5", "6"],
       correctIndex: 1,
       explanation: "2 + 2 = 4. Bu oddiy qo'shish amali.",
+      videoAnswer: undefined,
+      imageAnswer: undefined,
+      imageFile: null,
     },
     {
       text: "10 - 3 ning natijasi nima?",
       options: ["6", "7", "8", "9"],
       correctIndex: 1,
       explanation: "10 - 3 = 7. Bu ayirish amali.",
+      videoAnswer: undefined,
+      imageAnswer: undefined,
+      imageFile: null,
     },
     {
       text: "3 × 4 ning ko'paytmasi nechaga teng?",
       options: ["10", "11", "12", "13"],
       correctIndex: 2,
       explanation: "3 × 4 = 12. Bu ko'paytirish amali.",
+      videoAnswer: undefined,
+      imageAnswer: undefined,
+      imageFile: null,
     },
   ])
   const [loading, setLoading] = useState(false)
@@ -62,6 +74,9 @@ export default function CreateTestPage() {
         options: ["", "", "", ""],
         correctIndex: 0,
         explanation: "",
+        videoAnswer: undefined,
+        imageAnswer: undefined,
+        imageFile: null,
       },
     ])
   }
@@ -136,14 +151,33 @@ export default function CreateTestPage() {
 
     try {
       const questionsObj: Record<string, Question> = {}
-      questions.forEach((q, index) => {
-        questionsObj[`q${index + 1}`] = {
+      
+      // Upload images and create questions
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i]
+        let imageUrl: string | undefined = undefined
+        
+        // Upload image if provided
+        if (q.imageFile) {
+          try {
+            imageUrl = await uploadAnswerImage(q.imageFile)
+          } catch (error) {
+            console.error(`[v0] Error uploading image for question ${i + 1}:`, error)
+            setError(`${i + 1}-savol uchun rasm yuklanishda xatolik`)
+            setLoading(false)
+            return
+          }
+        }
+        
+        questionsObj[`q${i + 1}`] = {
           text: q.text.trim(),
           options: q.options.map((opt) => opt.trim()),
           correctIndex: q.correctIndex,
           explanation: q.explanation.trim(),
+          videoAnswer: q.videoAnswer?.trim() || undefined,
+          imageAnswer: imageUrl || q.imageAnswer?.trim() || undefined,
         }
-      })
+      }
 
       console.log("[v0] Calling createTest function")
       await createTest({
@@ -160,7 +194,7 @@ export default function CreateTestPage() {
       console.error("[v0] Error creating test:", error)
 
       if (error.code === "permission-denied") {
-        setError("Firebase ma'lumotlar bazasiga kirish ruxsati yo'q. Firebase Security Rules ni tekshiring.")
+        setError("Appwrite ma'lumotlar bazasiga kirish ruxsati yo'q.")
       } else if (error.code === "unauthenticated") {
         setError("Autentifikatsiya xatosi. Qaytadan tizimga kiring.")
       } else {
@@ -315,6 +349,47 @@ export default function CreateTestPage() {
                           placeholder="To'g'ri javob uchun izoh kiriting..."
                           required
                         />
+                      </div>
+
+                      <div className="border-t pt-4 space-y-4">
+                        <h4 className="font-medium text-sm">Qo'shimcha Javoblar (ixtiyoriy)</h4>
+                        
+                        <div className="space-y-2">
+                          <Label>YouTube Video Javob URL</Label>
+                          <Input
+                            type="url"
+                            value={question.videoAnswer || ""}
+                            onChange={(e) => updateQuestion(qIndex, "videoAnswer", e.target.value)}
+                            placeholder="https://youtube.com/watch?v=..."
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            YouTube video havola qo'shib, foydalanuvchilarga video qilish imkonini bering
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Rasmli Javob (Surat)</Label>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                const updated = [...questions]
+                                updated[qIndex].imageFile = file
+                                setQuestions(updated)
+                              }
+                            }}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Javobni tushuntiruvchi surat qo'shing (PNG, JPG, WebP)
+                          </p>
+                          {question.imageFile && (
+                            <p className="text-xs text-green-600">
+                              ✓ Fayl tanlab olingan: {question.imageFile.name}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

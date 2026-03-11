@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, BookOpen, Play } from "lucide-react"
-import { getTests, type Test } from "@/lib/firebase"
+import { getTests, type Test } from "@/lib/appwrite"
 import Link from "next/link"
 
 export default function TestsPage() {

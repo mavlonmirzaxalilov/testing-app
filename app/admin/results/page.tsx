@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Search, Download, BarChart3 } from "lucide-react"
-import { getTests, getResults, getUserData, type Test, type Result, type User } from "@/lib/firebase"
+import { getTests, getResults, getUserData, type Test, type Result, type User } from "@/lib/appwrite"
 import { useAuth } from "@/contexts/auth-context"
 import Link from "next/link"
 

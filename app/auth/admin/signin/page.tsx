@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Shield } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { signInWithEmailAndPasswordExtended } from "@/lib/firebase"
+import { signInWithEmailAndPasswordExtended } from "@/lib/appwrite"
 
 export default function AdminSignInPage() {
   const [email, setEmail] = useState("")

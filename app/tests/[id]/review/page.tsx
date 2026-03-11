@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { CheckCircle, XCircle, SkipForward, ChevronDown, Home, AlertCircle } from "lucide-react"
-import { getTest, getProgress, saveResult, type Test, type Progress, type Result } from "@/lib/firebase"
+import { getTest, getProgress, saveResult, type Test, type Progress, type Result } from "@/lib/appwrite"
+import { ImageAnswerModal } from "@/components/image-answer-modal"
 import Link from "next/link"
 
 export default function ReviewPage() {
@@ -24,6 +25,9 @@ export default function ReviewPage() {
   const [result, setResult] = useState<Result | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [imageModalOpen, setImageModalOpen] = useState(false)
+  const [selectedImageUrl, setSelectedImageUrl] = useState("")
+  const [selectedQuestionText, setSelectedQuestionText] = useState("")
 
   useEffect(() => {
     const loadReview = async () => {
@@ -81,6 +85,18 @@ export default function ReviewPage() {
 
     loadReview()
   }, [testId, user])
+
+  const handleVideoAnswer = (videoUrl: string) => {
+    if (videoUrl) {
+      window.open(videoUrl, "_blank")
+    }
+  }
+
+  const handleImageAnswer = (imageUrl: string, questionText: string) => {
+    setSelectedImageUrl(imageUrl)
+    setSelectedQuestionText(questionText)
+    setImageModalOpen(true)
+  }
 
   if (loading) {
     return (
@@ -211,6 +227,35 @@ export default function ReviewPage() {
                               <div className="text-sm">{question.explanation}</div>
                             </div>
                           )}
+
+                          {(question.videoAnswer || question.imageAnswer) && (
+                            <div className="flex gap-2 pt-2">
+                              {question.videoAnswer && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleVideoAnswer(question.videoAnswer!)}
+                                  className="gap-2"
+                                >
+                                  <span>▶️</span>
+                                  Video Javob
+                                </Button>
+                              )}
+                              {question.imageAnswer && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleImageAnswer(question.imageAnswer!, question.text)}
+                                  className="gap-2"
+                                >
+                                  <span>🖼️</span>
+                                  Rasmli Javob
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
@@ -281,6 +326,13 @@ export default function ReviewPage() {
             </Link>
           </div>
         </div>
+
+        <ImageAnswerModal
+          isOpen={imageModalOpen}
+          imageUrl={selectedImageUrl}
+          questionText={selectedQuestionText}
+          onClose={() => setImageModalOpen(false)}
+        />
       </div>
     </ProtectedRoute>
   )

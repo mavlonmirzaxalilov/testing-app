@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Plus, Trash2, Save, ArrowLeft, Loader2 } from "lucide-react"
-import {  getTest, updateTest, type Question, type Test } from "@/lib/firebase"
+import { getTest, updateTest, uploadAnswerImage, type Question, type Test } from "@/lib/appwrite"
 import Link from "next/link"
 
 interface QuestionForm {

@@ -3,13 +3,13 @@
 import type React from 'react'
 import { createContext, useContext, useEffect, useState } from 'react'
 import {
-	getAuthInstance,
 	type User,
 	createUserWithEmailAndPasswordExtended,
 	signInWithEmailAndPasswordExtended,
 	signOutUser,
-	getUserData,
-} from '@/lib/firebase'
+	getCurrentUser,
+} from '@/lib/appwrite'
+import { getAppwriteAccount } from '@/lib/appwrite-client'
 
 interface AuthContextType {
 	user: User | null
@@ -39,8 +39,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	useEffect(() => {
 		if (!isClient) return
 
-		let unsubscribe: (() => void) | undefined
-
 		const initAuth = async () => {
 			try {
 				if (typeof window === 'undefined') {
@@ -49,41 +47,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					return
 				}
 
-				// console.log("[v0] Initializing Firebase auth...")
+				// console.log("[v0] Initializing Appwrite auth...")
 
-				const auth = await getAuthInstance()
+				const account = await getAppwriteAccount()
 
-				if (!auth) {
+				if (!account) {
 					// console.log("[v0] Auth instance not available, skipping initialization")
 					setLoading(false)
 					return
 				}
 
-				const { onAuthStateChanged } = await import('firebase/auth')
-
-				unsubscribe = onAuthStateChanged(auth, async firebaseUser => {
+				try {
+					const appwriteUser = await account.get()
 					console.log(
-						'[Auth] onAuthStateChanged ->',
-						firebaseUser ? firebaseUser.email : 'no user'
+						'[Auth] Appwrite user session ->',
+						appwriteUser ? appwriteUser.email : 'no user'
 					)
 
-					try {
-						if (firebaseUser) {
-							const userData = await getUserData(firebaseUser.uid)
-							console.log('[Auth] Firestore user data ->', userData)
-							setUser(userData)
-						} else {
-							setUser(null)
-						}
-					} catch (error) {
-						console.error('[Auth] getUserData error:', error)
+					if (appwriteUser) {
+						const userData = await getCurrentUser()
+						console.log('[Auth] User data ->', userData)
+						setUser(userData)
+					} else {
 						setUser(null)
-					} finally {
-						setLoading(false)
 					}
-				})
-
-				// console.log("[v0] Auth listener attached successfully")
+				} catch (error) {
+					console.log('[Auth] No active session')
+					setUser(null)
+				} finally {
+					setLoading(false)
+				}
 			} catch (error) {
 				// console.error("[v0] Error initializing auth:", error)
 				setLoading(false)
@@ -94,10 +87,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 		return () => {
 			clearTimeout(timer)
-			if (unsubscribe) {
-				console.log('[v0] Cleaning up auth listener')
-				unsubscribe()
-			}
 		}
 	}, [isClient])
 

@@ -6,7 +6,7 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { BarChart3, CheckCircle, XCircle, SkipForward } from "lucide-react"
-import { db, type Test, type Result } from "@/lib/firebase"
+import { getTests, getResults, type Test, type Result } from "@/lib/appwrite"
 
 export default function UserResultsPage() {
   const { user } = useAuth()
@@ -19,7 +19,7 @@ export default function UserResultsPage() {
       if (!user) return
 
       try {
-        const [testsData, resultsData] = await Promise.all([db.getTests(), db.getResults(user.uid)])
+        const [testsData, resultsData] = await Promise.all([getTests(), getResults(user.uid)])
         setTests(testsData)
         setResults(resultsData)
       } catch (error) {

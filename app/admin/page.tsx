@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Plus, BookOpen, Users, BarChart3, Edit, Trash2 } from "lucide-react"
-import { getTests, getResults, deleteTest, type Test, type Result } from "@/lib/firebase"
+import { getTests, getResults, deleteTest, type Test, type Result } from "@/lib/appwrite"
 import Link from "next/link"
 
 export default function AdminDashboard() {

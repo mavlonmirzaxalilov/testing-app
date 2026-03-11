@@ -17,7 +17,7 @@ import {
 	type Test,
 	type Progress,
 	type Answer,
-} from '@/lib/firebase'
+} from '@/lib/appwrite'
 
 export default function TestPage() {
 	const params = useParams()
