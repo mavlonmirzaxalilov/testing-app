@@ -4,6 +4,11 @@ import {
   getAppwriteStorage,
   getAppwriteConfig,
 } from './appwrite-client'
+import {
+  createRegistrationError,
+  logRegistrationError,
+  type RegistrationError,
+} from './error-handler'
 import { ID } from 'appwrite'
 
 // Types
@@ -97,9 +102,20 @@ export const createUserWithEmailAndPasswordExtended = async (
 
     return userData
   } catch (error) {
-    console.error('Error creating user:', error)
-    throw error
+    console.error('[Registration] Error creating user:', error)
+    // Re-throw with structured error information for the UI to handle
+    const registrationError = createRegistrationError(error)
+    logRegistrationError(registrationError)
+    throw registrationError
   }
+}
+
+export const createRegistrationErrorFromAppwrite = (
+  error: unknown
+): RegistrationError => {
+  const registrationError = createRegistrationError(error)
+  logRegistrationError(registrationError)
+  return registrationError
 }
 
 export const signInWithEmailAndPasswordExtended = async (

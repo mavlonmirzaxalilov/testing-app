@@ -2,7 +2,7 @@
 
 import type React from 'react'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,7 +14,8 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { RegistrationErrorDisplay } from '@/components/registration-error'
+import type { RegistrationError } from '@/lib/error-handler'
 import { BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -26,56 +27,127 @@ export default function SignUpPage() {
 	const [email, setEmail] = useState('')
 	const [password, setPassword] = useState('')
 	const [confirmPassword, setConfirmPassword] = useState('')
-	const [error, setError] = useState('')
+	const [error, setError] = useState<RegistrationError | null>(null)
 	const [loading, setLoading] = useState(false)
+	const [isRetrying, setIsRetrying] = useState(false)
+	const [validationError, setValidationError] = useState('')
 	const { signUp } = useAuth()
 	const router = useRouter()
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault()
-		setError('')
+	// Listen for clear error events
+	useEffect(() => {
+		const handleClearError = () => {
+			setError(null)
+		}
+
+		window.addEventListener('clearError', handleClearError)
+		return () => window.removeEventListener('clearError', handleClearError)
+	}, [])
+
+	const validateForm = (): boolean => {
+		setValidationError('')
 
 		if (!firstName.trim()) {
-			setError('Ism kiritilishi shart')
-			return
+			setValidationError('Ism kiritilishi shart')
+			return false
 		}
 
 		if (!lastName.trim()) {
-			setError('Familiya kiritilishi shart')
-			return
+			setValidationError('Familiya kiritilishi shart')
+			return false
 		}
 
 		if (!phoneNumber.trim()) {
-			setError('Telefon raqam kiritilishi shart')
-			return
+			setValidationError('Telefon raqam kiritilishi shart')
+			return false
 		}
 
 		// Basic phone number validation
 		const phoneRegex = /^[+]?[0-9\s\-$$$$]{9,15}$/
 		if (!phoneRegex.test(phoneNumber)) {
-			setError("Telefon raqam formati noto'g'ri")
-			return
+			setValidationError("Telefon raqam formati noto'g'ri")
+			return false
+		}
+
+		if (!email.trim()) {
+			setValidationError('Email kiritilishi shart')
+			return false
 		}
 
 		if (password !== confirmPassword) {
-			setError('Parollar mos kelmaydi')
-			return
+			setValidationError('Parollar mos kelmaydi')
+			return false
 		}
 
 		if (password.length < 6) {
-			setError("Parol kamida 6 ta belgidan iborat bo'lishi kerak")
+			setValidationError("Parol kamida 6 ta belgidan iborat bo'lishi kerak")
+			return false
+		}
+
+		return true
+	}
+
+	const handleSubmit = async (e: React.FormEvent) => {
+		e.preventDefault()
+		setError(null)
+		setValidationError('')
+
+		if (!validateForm()) {
 			return
 		}
 
 		setLoading(true)
+		setIsRetrying(false)
 
 		try {
 			await signUp(email, password, firstName, lastName, phoneNumber)
 			router.push('/')
-		} catch (err) {
-			setError("Ro'yxatdan o'tishda xatolik yuz berdi")
+		} catch (err: unknown) {
+			console.error('[Signup] Registration error:', err)
+			// Check if it's already a RegistrationError (from our error handler)
+			if (err && typeof err === 'object' && 'category' in err) {
+				setError(err as RegistrationError)
+			} else {
+				// Create a new RegistrationError from the caught error
+				const registrationError: RegistrationError = {
+					category: 'UNKNOWN_ERROR',
+					message: "Ro'yxatdan o'tishda noma'lum xatolik yuz berdi. Iltimos, qayta urini.",
+					details: String(err),
+					timestamp: new Date().toISOString(),
+					retryable: true,
+					originalError: err,
+				}
+				setError(registrationError)
+			}
 		} finally {
 			setLoading(false)
+		}
+	}
+
+	const handleRetry = async () => {
+		setIsRetrying(true)
+		setError(null)
+
+		try {
+			await signUp(email, password, firstName, lastName, phoneNumber)
+			router.push('/')
+		} catch (err: unknown) {
+			console.error('[Signup] Retry registration error:', err)
+			if (err && typeof err === 'object' && 'category' in err) {
+				setError(err as RegistrationError)
+			} else {
+				const registrationError: RegistrationError = {
+					category: 'UNKNOWN_ERROR',
+					message: "Ro'yxatdan o'tishda noma'lum xatolik yuz berdi. Iltimos, qayta urini.",
+					details: String(err),
+					timestamp: new Date().toISOString(),
+					retryable: true,
+					originalError: err,
+				}
+				setError(registrationError)
+			}
+		} finally {
+			setIsRetrying(false)
 		}
 	}
 
@@ -94,12 +166,23 @@ export default function SignUpPage() {
 						<CardDescription>Ma'lumotlaringizni kiriting</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<form onSubmit={handleSubmit} className='space-y-4'>
+						<div className='space-y-4'>
 							{error && (
-								<Alert variant='destructive'>
-									<AlertDescription>{error}</AlertDescription>
-								</Alert>
+								<RegistrationErrorDisplay
+									error={error}
+									onRetry={handleRetry}
+									isRetrying={isRetrying}
+								/>
 							)}
+
+							{validationError && (
+								<div className='border border-red-200 bg-red-50 rounded-lg p-4 text-sm text-red-800'>
+									{validationError}
+								</div>
+							)}
+						</div>
+
+						<form onSubmit={handleSubmit} className={`space-y-4 ${error ? 'mt-6 pt-6 border-t' : ''}`}>
 
 							<div className='grid grid-cols-2 gap-4'>
 								<div className='space-y-2'>

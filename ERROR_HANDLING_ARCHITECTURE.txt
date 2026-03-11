@@ -1,0 +1,536 @@
+================================================================================
+                    ERROR HANDLING SYSTEM ARCHITECTURE
+================================================================================
+
+SYSTEM OVERVIEW
+================================================================================
+
+                         ┌─────────────────────────────┐
+                         │    User Registration Page    │
+                         │   (/auth/signup/page.tsx)   │
+                         └──────────────┬──────────────┘
+                                        │
+                    ┌───────────────────┼───────────────────┐
+                    │                   │                   │
+                    ▼                   ▼                   ▼
+        ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+        │ Form Validation  │ │  Submit Handler  │ │ Retry Handler    │
+        │ (Client-side)    │ │ (handleSubmit)   │ │ (handleRetry)    │
+        └────────┬─────────┘ └────────┬─────────┘ └────────┬─────────┘
+                 │                    │                     │
+                 │ If invalid         │ Send form data      │ Retry
+                 │ Show error         │                     │ registration
+                 └────────┬───────────┴─────────────────────┘
+                          │
+                          ▼
+            ┌─────────────────────────────────┐
+            │    Auth Context (auth-context)  │
+            │        .signUp() method         │
+            └────────────────┬────────────────┘
+                             │
+                             ▼
+            ┌─────────────────────────────────┐
+            │  Appwrite Functions (appwrite)  │
+            │ createUserWithEmailAndPassword  │
+            │          Extended()             │
+            └────────────────┬────────────────┘
+                             │
+                   ┌─────────┴─────────┐
+                   │                   │
+                   ▼                   ▼
+            ┌─────────────┐    ┌──────────────┐
+            │   SUCCESS   │    │    ERROR     │
+            │ User Created│    │ Exception    │
+            │ Redirect    │    │ Caught       │
+            └─────────────┘    └──────┬───────┘
+                                      │
+                                      ▼
+                    ┌──────────────────────────────┐
+                    │   Error Handler Library      │
+                    │  (lib/error-handler.ts)      │
+                    │                              │
+                    ├─ categorizeError()           │
+                    │  └─ Analyze & categorize     │
+                    │                              │
+                    ├─ createRegistrationError()   │
+                    │  └─ Create structured error  │
+                    │                              │
+                    └──────────────┬───────────────┘
+                                   │
+                        ┌──────────┴──────────┐
+                        │                     │
+                        ▼                     ▼
+              ┌────────────────┐  ┌──────────────────┐
+              │ logRegistration│  │ Return RegistrationError
+              │ Error()        │  │ - category        │
+              │ Console logs   │  │ - message         │
+              │ (dev only)     │  │ - details         │
+              └────────────────┘  │ - timestamp       │
+                                  │ - retryable       │
+                                  └─────────┬────────┘
+                                            │
+                                            ▼
+                          ┌─────────────────────────────┐
+                          │  Signup Page Catches Error  │
+                          │  setState(error)            │
+                          └────────────────┬────────────┘
+                                           │
+                                           ▼
+                          ┌─────────────────────────────┐
+                          │ RegistrationErrorDisplay    │
+                          │  Component Renders          │
+                          │ (/components/registration-  │
+                          │  error.tsx)                 │
+                          └────────────────┬────────────┘
+                                           │
+                   ┌───────────────────────┼───────────────────────┐
+                   │                       │                       │
+                   ▼                       ▼                       ▼
+        ┌────────────────────┐ ┌───────────────────┐ ┌─────────────────┐
+        │ Error Message      │ │ Expandable Details│ │ Retry Button    │
+        │ Display            │ │ (if applicable)   │ │ (if retryable)  │
+        │ Title: "Qayta..."  │ │ Technical info    │ │ Or Close button │
+        │ User message (UZ)  │ │ Timestamp         │ │                 │
+        │ Color-coded        │ │                   │ │                 │
+        │ Color by severity  │ │                   │ │                 │
+        └────────────────────┘ └───────────────────┘ └─────────────────┘
+
+
+ERROR CATEGORIZATION TREE
+================================================================================
+
+Error Detected
+    │
+    ├─ Contains "email" + ("already", "exists", "unique")
+    │  └─► EMAIL_ALREADY_EXISTS (Blue - Info - Not Retryable)
+    │
+    ├─ Contains "invalid" + "email" (not "already")
+    │  └─► INVALID_EMAIL (Red - Error - Not Retryable)
+    │
+    ├─ Contains "password" + ("weak", "strong", "requirements")
+    │  └─► WEAK_PASSWORD (Red - Error - Not Retryable)
+    │
+    ├─ Contains ("network", "timeout", "connection", "econnrefused")
+    │  └─► NETWORK_ERROR (Amber - Warning - Retryable)
+    │
+    ├─ Status >= 500 OR contains ("server", "internal")
+    │  └─► SERVER_ERROR (Amber - Warning - Retryable)
+    │
+    └─ Unmatched/Unknown
+       └─► UNKNOWN_ERROR (Red - Error - Retryable)
+
+
+COMPONENT HIERARCHY
+================================================================================
+
+SignUpPage (Client Component)
+│
+├── State Management
+│   ├── firstName, lastName, phoneNumber, email, password, confirmPassword
+│   ├── error: RegistrationError | null
+│   ├── validationError: string
+│   ├── loading: boolean
+│   └── isRetrying: boolean
+│
+├── Methods
+│   ├── validateForm() → boolean
+│   ├── handleSubmit() → Promise<void>
+│   └── handleRetry() → Promise<void>
+│
+├── Event Listeners
+│   └── useEffect(() => addEventListener('clearError'))
+│
+└── Render
+    ├── Container
+    │   ├── Header (Ism O'tish)
+    │   │   ├── Icon
+    │   │   ├── Title
+    │   │   └── Description
+    │   │
+    │   └── Card
+    │       ├── RegistrationErrorDisplay (conditional)
+    │       │   ├── Alert
+    │       │   ├── Error Message
+    │       │   ├── Expandable Details
+    │       │   ├── Retry Button (conditional)
+    │       │   ├── Close Button
+    │       │   └── Helpful Tips
+    │       │
+    │       ├── Validation Error Alert (conditional)
+    │       │
+    │       └── Form
+    │           ├── FirstName Input
+    │           ├── LastName Input
+    │           ├── Phone Input
+    │           ├── Email Input
+    │           ├── Password Input
+    │           ├── Confirm Password Input
+    │           └── Submit Button
+    │
+    └── Sign In Link
+
+
+DATA FLOW: REGISTRATION ERROR
+================================================================================
+
+Step 1: User Submits Form
+┌─────────────────────────────┐
+│ handleSubmit(e) triggered   │
+│ e.preventDefault()          │
+│ setError(null)              │
+│ validateForm()              │
+└──────────────┬──────────────┘
+               │
+       ┌───────┴───────┐
+       │               │
+   Invalid         Valid
+   Return          Continue
+       │               │
+       ▼               ▼
+ Show               Call
+Validation      signUp() from
+Error            Auth Context
+                     │
+                     ▼
+Step 2: Authentication
+┌──────────────────────────────┐
+│ Auth Context calls signUp()  │
+│ → createUserWithEmail...()   │
+│ → Appwrite registration      │
+└──────────────┬───────────────┘
+               │
+       ┌───────┴───────┐
+       │               │
+   Success        Error
+   User           Exception
+ Created        Caught
+       │               │
+       ▼               ▼
+  Redirect       Continue
+   Home
+
+Step 3: Error Handling
+┌──────────────────────────────┐
+│ createUserWithEmailPassword  │
+│ () throws error              │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ createRegistrationError()    │
+│ - Categorize error           │
+│ - Create RegistrationError   │
+│   object                     │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ logRegistrationError()       │
+│ - Log to console (dev)       │
+│ - Include timestamp, details │
+│ - Ready for external service │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Re-throw RegistrationError   │
+│ Back to signup page          │
+└──────────────┬───────────────┘
+               │
+               ▼
+Step 4: Display Error
+┌──────────────────────────────┐
+│ Signup page catch block      │
+│ receives RegistrationError   │
+│ setError(error)              │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Render RegistrationError     │
+│ Display component            │
+│ - Main message               │
+│ - User message               │
+│ - Details toggle             │
+│ - Retry button (conditional) │
+│ - Helpful tips               │
+└──────────────────────────────┘
+
+Step 5: User Decides Action
+┌──────────────────────────────┐
+│ User sees error message      │
+└──────────────┬───────────────┘
+               │
+       ┌───────┴──────────────┐
+       │                      │
+   Not Retryable         Retryable
+   (Email exists, etc)   (Network, Server)
+       │                      │
+       ▼                      ▼
+   Click Close           Click Retry
+   Clear error           handleRetry()
+       │                      │
+       └──────────┬───────────┘
+                  │
+                  ▼
+        Return to form
+        Data preserved
+        Try again
+
+Step 6: Retry Flow
+┌──────────────────────────────┐
+│ handleRetry() called         │
+│ - setIsRetrying(true)        │
+│ - Clear error state          │
+│ - Validation runs again      │
+└──────────────┬───────────────┘
+               │
+       ┌───────┴───────┐
+       │               │
+   Invalid         Valid
+       │               │
+       ▼               ▼
+   Show          Attempt
+ Validation    Registration
+   Error        Again
+       │               │
+       │               ▼
+       │         Same error?
+       │         └─ Show error
+       │         Success?
+       │         └─ Redirect
+       │
+       └─────────────┘
+
+
+STATE TRANSITIONS
+================================================================================
+
+INITIAL STATE
+    │
+    ├─ error: null
+    ├─ validationError: ""
+    ├─ loading: false
+    └─ isRetrying: false
+
+SUBMISSION STARTED
+    ├─ error: null (cleared)
+    ├─ validationError: "" (cleared)
+    ├─ loading: true
+    └─ isRetrying: false
+
+VALIDATION FAILED
+    ├─ error: null
+    ├─ validationError: "Ism kiritilishi shart"
+    ├─ loading: false (unchanged)
+    └─ isRetrying: false (unchanged)
+
+VALIDATION PASSED
+    Continue to Appwrite...
+
+APPWRITE SUCCESS
+    ├─ error: null
+    ├─ validationError: ""
+    ├─ loading: false
+    └─ isRetrying: false
+    
+    Action: Redirect to home page
+
+APPWRITE ERROR
+    ├─ error: RegistrationError { ... }
+    ├─ validationError: "" (cleared)
+    ├─ loading: false
+    └─ isRetrying: false
+
+RETRY STARTED
+    ├─ error: null (cleared)
+    ├─ validationError: "" (cleared)
+    ├─ loading: false (unchanged)
+    └─ isRetrying: true
+
+RETRY VALIDATION FAILED
+    ├─ error: null
+    ├─ validationError: "Error message..."
+    ├─ loading: false
+    └─ isRetrying: false
+
+RETRY SUCCESS
+    ├─ error: null
+    ├─ validationError: ""
+    ├─ loading: false
+    └─ isRetrying: false
+    
+    Action: Redirect to home page
+
+RETRY FAILED
+    ├─ error: RegistrationError { ... } (new error)
+    ├─ validationError: ""
+    ├─ loading: false
+    └─ isRetrying: false
+    
+    User can click retry again
+
+
+ERROR OBJECT STRUCTURE
+================================================================================
+
+RegistrationError {
+  category: ErrorCategory
+    ├─ EMAIL_ALREADY_EXISTS
+    ├─ INVALID_EMAIL
+    ├─ WEAK_PASSWORD
+    ├─ NETWORK_ERROR
+    ├─ SERVER_ERROR
+    └─ UNKNOWN_ERROR
+
+  message: string
+    └─ User-friendly Uzbek message
+       "Bu elektron pochta manzili allaqachon ro'yxatga olingan..."
+
+  details: string
+    └─ Technical error details
+       "User with email already exists"
+
+  timestamp: string (ISO 8601)
+    └─ "2024-03-11T10:35:22.123Z"
+
+  retryable: boolean
+    ├─ true: Network, Server, Unknown errors
+    └─ false: Email exists, Invalid email, Weak password
+
+  originalError?: unknown
+    └─ Original error object for debugging
+}
+
+
+UI COLOR SCHEMA
+================================================================================
+
+ERROR (Red)
+    ├─ Border: rgb(220, 38, 38) #DC2626
+    ├─ Background: rgb(254, 242, 242) #FEF2F2
+    ├─ Text: rgb(159, 18, 57) #9F1239
+    └─ Lighter text: rgb(127, 29, 29) #7F1D1D
+
+WARNING (Amber)
+    ├─ Border: rgb(217, 119, 6) #D97706
+    ├─ Background: rgb(254, 243, 235) #FEFAE8
+    ├─ Text: rgb(180, 83, 9) #B45309
+    └─ Lighter text: rgb(120, 53, 15) #78350F
+
+INFO (Blue)
+    ├─ Border: rgb(191, 219, 254) #BFDCFE
+    ├─ Background: rgb(239, 246, 255) #EFF6FF
+    ├─ Text: rgb(29, 78, 216) #1D4ED8
+    └─ Lighter text: rgb(30, 41, 59) #1E293B
+
+
+LOGGING STRUCTURE
+================================================================================
+
+Console Output (Development Only):
+[Registration Error] {
+  timestamp: "2024-03-11T10:35:22.123Z",
+  category: "EMAIL_ALREADY_EXISTS",
+  message: "Bu elektron pochta manzili allaqachon ro'yxatga olingan...",
+  details: "User with email already exists",
+  retryable: false,
+  userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...",
+  url: "http://localhost:3000/auth/signup"
+}
+
+Fields Description:
+  timestamp  → When error occurred (UTC)
+  category   → Error type for categorization
+  message    → User-friendly message (Uzbek)
+  details    → Technical error details
+  retryable  → Can user attempt again?
+  userAgent  → Browser info (for analytics)
+  url        → Page where error occurred (for context)
+
+
+INTERACTION DIAGRAM
+================================================================================
+
+User                Form                 Error             Component
+│                    │                   Handler           │
+├─ Fill form ──────→ │                    │                 │
+│                    │                    │                 │
+├─ Click submit ──→  │                    │                 │
+│                    │                    │                 │
+│                    ├─ Validate ────────→│                 │
+│                    │                    │                 │
+│                    ├─ If valid, call signup()             │
+│                    │                    │                 │
+│                    ├─ Catch error ─────→│                 │
+│                    │                    │                 │
+│                    │                    ├─ Categorize    │
+│                    │                    │                 │
+│                    │                    ├─ Log           │
+│                    │                    │                 │
+│                    │      Return RegistrationError        │
+│                    │←─────────────────────                │
+│                    │                    │                 │
+│                    ├─ setState(error) ──────────────────→ │
+│                    │                    │                 │
+│                    │                    │    Render       │
+│                    │                    │    Error UI    │
+│                    │                    │                 │
+├─ See error ←──────────────────────────────────────────────┤
+│                    │                    │                 │
+├─ Expand details ──→│                    │      Toggle    │
+│                    │                    │      Details   │
+├─ See technical ←──────────────────────────────────────────┤
+│   details          │                    │                 │
+│                    │                    │                 │
+├─ Click retry ────→ │                    │                 │
+│                    │                    │                 │
+│                    ├─ Validate again ──→│                 │
+│                    │                    │                 │
+│                    ├─ Call signup() again                 │
+│                    │                    │                 │
+│                    ├─ Success / Error ─→│                 │
+│                    │                    │                 │
+└─────────────────────────────────────────────────────────────
+
+DEPENDENCIES DIAGRAM
+================================================================================
+
+lib/error-handler.ts
+    ├─ No external dependencies
+    ├─ Pure TypeScript
+    └─ Used by:
+        ├─ lib/appwrite.ts
+        └─ app/auth/signup/page.tsx
+        └─ components/registration-error.tsx
+
+lib/appwrite.ts
+    ├─ Depends on: error-handler.ts
+    ├─ Depends on: appwrite-client.ts
+    ├─ Depends on: Appwrite SDK
+    └─ Used by:
+        └─ contexts/auth-context.tsx
+
+contexts/auth-context.tsx
+    ├─ Depends on: appwrite.ts
+    ├─ Uses: React Context API
+    └─ Used by:
+        └─ app/auth/signup/page.tsx
+
+app/auth/signup/page.tsx
+    ├─ Depends on: auth-context.tsx
+    ├─ Depends on: error-handler.ts
+    ├─ Depends on: registration-error.tsx
+    ├─ Uses: React hooks
+    └─ Uses: UI components
+
+components/registration-error.tsx
+    ├─ Depends on: error-handler.ts (for types)
+    ├─ Depends on: lucide-react (for icons)
+    ├─ Depends on: UI components
+    └─ Used by:
+        └─ app/auth/signup/page.tsx
+
+================================================================================
+                              END OF ARCHITECTURE
+================================================================================
