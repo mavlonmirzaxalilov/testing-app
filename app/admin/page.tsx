@@ -282,7 +282,7 @@ export default function AdminDashboard() {
 												<div>
 													<div className='font-medium'>{test?.title || 'Test topilmadi'}</div>
 													<div className='text-sm text-muted-foreground'>
-														{resultUser ? `${resultUser.firstName} ${resultUser.lastName}` : result.userId} • {new Date(result.completedAt).toLocaleDateString('uz-UZ')}
+														{resultUser ? `${resultUser.firstName} ${resultUser.lastName}` : result.userId} 
 													</div>
 												</div>
 												<div className='text-right'>
