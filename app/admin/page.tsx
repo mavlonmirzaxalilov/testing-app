@@ -359,9 +359,7 @@ export default function AdminDashboard() {
 											<div className='text-sm text-muted-foreground'>
 												{resultUser ? `${resultUser.firstName} ${resultUser.lastName}` : result.userId}
 											</div>
-											<div className='text-xs text-muted-foreground'>
-												{new Date(result.completedAt).toLocaleDateString('uz-UZ', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-											</div>
+											
 										</div>
 										<div className='text-right'>
 											<div className='font-bold text-lg'>{result.correctCount}/{totalQ}</div>
