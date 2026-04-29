@@ -168,6 +168,7 @@ export const getTests = async (): Promise<Test[]> => {
 	const response = await databases.listDocuments(
 		appwriteConfig.databaseId,
 		appwriteConfig.testsCollectionId,
+		[Query.limit(1000)] 
 	)
 
 	return response.documents.map(doc => ({
@@ -328,7 +329,7 @@ export const saveResult = async (resultData: Result): Promise<void> => {
 }
 
 export const getResults = async (userId?: string): Promise<Result[]> => {
-	const queries = []
+	const queries = [Query.limit(5000)] 
 	if (userId) {
 		queries.push(Query.equal('userId', userId))
 	}
