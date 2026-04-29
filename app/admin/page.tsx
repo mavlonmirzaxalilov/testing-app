@@ -64,7 +64,6 @@ export default function AdminDashboard() {
 					databases.listDocuments(
 						appwriteConfig.databaseId,
 						appwriteConfig.usersCollectionId,
-						  [Query.limit(1000)] 
 					),
 				])
 				setTests(testsData)
