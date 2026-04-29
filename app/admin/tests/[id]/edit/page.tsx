@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { getTest, updateTest, type Question, type Test } from '@/lib/appwrite'
-import { ArrowLeft, Loader2, Plus, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus, Save, Trash2, Youtube } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -27,6 +27,7 @@ interface QuestionForm {
 	options: string[]
 	correctIndex: number
 	explanation: string
+	youtubeUrl: string
 }
 
 export default function EditTestPage() {
@@ -43,7 +44,6 @@ export default function EditTestPage() {
 	const [saving, setSaving] = useState(false)
 	const [error, setError] = useState('')
 
-	// Load existing test data
 	useEffect(() => {
 		const loadTest = async () => {
 			try {
@@ -58,7 +58,6 @@ export default function EditTestPage() {
 				setDescription(testData.description)
 				setDurationMinutes(testData.durationMinutes)
 
-				// Convert questions object to array
 				const questionsArray: QuestionForm[] = Object.values(
 					testData.questions,
 				).map((q: Question) => ({
@@ -66,6 +65,7 @@ export default function EditTestPage() {
 					options: [...q.options],
 					correctIndex: q.correctIndex,
 					explanation: q.explanation,
+					youtubeUrl: q.youtubeUrl || '',
 				}))
 
 				setQuestions(questionsArray)
@@ -90,6 +90,7 @@ export default function EditTestPage() {
 				options: ['', '', '', ''],
 				correctIndex: 0,
 				explanation: '',
+				youtubeUrl: '',
 			},
 		])
 	}
@@ -124,7 +125,6 @@ export default function EditTestPage() {
 		e.preventDefault()
 		setError('')
 
-		// Validation
 		if (!title.trim() || !description.trim()) {
 			setError('Sarlavha va tavsif kiritilishi shart')
 			return
@@ -163,6 +163,7 @@ export default function EditTestPage() {
 					options: q.options.map(opt => opt.trim()),
 					correctIndex: q.correctIndex,
 					explanation: q.explanation.trim(),
+					youtubeUrl: q.youtubeUrl?.trim() || '',
 				}
 			})
 
@@ -390,6 +391,26 @@ export default function EditTestPage() {
 													required
 												/>
 											</div>
+
+											{/* YouTube URL */}
+											<div className='space-y-2'>
+												<Label className='flex items-center gap-2'>
+													<Youtube className='h-4 w-4 text-red-500' />
+													YouTube havolasi (ixtiyoriy)
+												</Label>
+												<Input
+													value={question.youtubeUrl}
+													onChange={e =>
+														updateQuestion(qIndex, 'youtubeUrl', e.target.value)
+													}
+													placeholder='https://youtube.com/watch?v=...'
+												/>
+												{question.youtubeUrl && (
+													<p className='text-xs text-muted-foreground'>
+														✅ Havola kiritildi — test natijasida video ko'rsatiladi
+													</p>
+												)}
+											</div>
 										</CardContent>
 									</Card>
 								))}
@@ -404,7 +425,11 @@ export default function EditTestPage() {
 								</Button>
 							</Link>
 							<Button type='submit' disabled={saving}>
-								<Save className='h-4 w-4 mr-2' />
+								{saving ? (
+									<Loader2 className='h-4 w-4 mr-2 animate-spin' />
+								) : (
+									<Save className='h-4 w-4 mr-2' />
+								)}
 								{saving ? 'Saqlanmoqda...' : "O'zgarishlarni Saqlash"}
 							</Button>
 						</div>
