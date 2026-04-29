@@ -1,6 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
+import { Query } from 'appwrite'
 import { ProtectedRoute } from '@/components/protected-route'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -64,6 +65,7 @@ export default function AdminDashboard() {
 					databases.listDocuments(
 						appwriteConfig.databaseId,
 						appwriteConfig.usersCollectionId,
+						  [Query.limit(1000)] 
 					),
 				])
 				setTests(testsData)
