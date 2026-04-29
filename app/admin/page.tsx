@@ -101,7 +101,7 @@ export default function AdminDashboard() {
 		)
 	}
 
-	const totalUsers = new Set(results.map(r => r.userId)).size
+	const totalUsers = users.length
 	const averageScore =
 		results.length > 0
 			? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length)
